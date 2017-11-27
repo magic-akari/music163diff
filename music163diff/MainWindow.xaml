@@ -29,7 +29,7 @@
                 <ItemsControl Name="log_box" Background="Black" >
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding str}" Foreground="{Binding color}" Focusable="False"/>
+                            <TextBlock Text="{Binding Str}" Foreground="{Binding Color}" Focusable="False"/>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

@@ -1,0 +1,194 @@
+table {
+  border-spacing: 0;
+  border-collapse: collapse;
+}
+
+tr {
+  background-color: #fff;
+  border-top: 1px solid #c6cbd1;
+}
+
+tr:nth-child(2n) {
+  background-color: #f6f8fa;
+}
+
+th {
+  padding: 6px 13px;
+  border: 1px solid #dfe2e5;
+}
+
+td {
+  padding: 6px 13px;
+  border: 1px solid #dfe2e5;
+}
+
+a {
+  color: #111;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #0366d6;
+  text-decoration: underline;
+}
+
+section {
+  border: 1px solid blue;
+  -ms-border-radius: 5px;
+  border-radius: 5px;
+  padding: 1rem;
+  margin: 1rem;
+}
+
+ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+li {
+  padding: 6px 13px;
+  border: 1px solid #dfe2e5;
+  border-top: 1px solid #c6cbd1;
+}
+
+li:nth-child(2n) {
+  background-color: #f6f8fa;
+}
+
+summary {
+  font-size: 1.5rem;
+  display: block;
+}
+
+summary.large {
+  font-size: 2rem;
+}
+
+img {
+  width: 140px;
+  height: 140px;
+}
+
+.samesongs > table {
+  width: 100%;
+}
+
+.same {
+  background-color: orange !important;
+}
+
+.playlistContainer {
+  display: flex;
+  -o-justify-content: space-between;
+  -webkit-justify-content: space-between;
+  justify-content: space-between;
+}
+
+.playlist {
+  -webkit-flex: none;
+  -ms-flex: none;
+  -o-flex: none;
+  flex: none;
+  width: 49%;
+  display: inline-block;
+}
+
+@media (max-width: 1024px) {
+  .playlistContainer {
+    flex-direction: column;
+  }
+
+  .playlist {
+    width: 100%;
+  }
+}
+
+caption {
+  font-size: 1.5rem;
+}
+
+tr:not(:nth-child(4n + 1)) {
+  word-break: break-all;
+}
+
+input[type="checkbox"] {
+  display: none;
+}
+
+label {
+  margin-right: 1rem;
+  margin-bottom: 1rem;
+}
+
+:checked + label::after {
+  content: "\2714";
+}
+
+#only_same:checked + label + .playlistContainer tbody > tr:not(.same) {
+  display: none;
+}
+
+#show_others:not(:checked)
+  + label
+  + #only_same
+  + label
+  + .playlistContainer
+  td:nth-child(4n + 3),
+#show_others:not(:checked)
+  + label
+  + #only_same
+  + label
+  + .playlistContainer
+  td:nth-child(4n),
+#show_others:not(:checked)
+  + label
+  + #only_same
+  + label
+  + .playlistContainer
+  th:nth-child(4n + 3),
+#show_others:not(:checked)
+  + label
+  + #only_same
+  + label
+  + .playlistContainer
+  th:nth-child(4n) {
+  display: none;
+}
+
+.flexbox {
+  display: flex;
+  -o-justify-content: space-between;
+  -webkit-justify-content: space-between;
+  justify-content: space-between;
+}
+
+.flexbox > details {
+  -webkit-flex: none;
+  -ms-flex: none;
+  -o-flex: none;
+  flex: none;
+  width: 32%;
+}
+
+.flexbox > details:nth-child(2) {
+  -o-order: -1;
+  -webkit-order: -1;
+  order: -1;
+}
+
+@media (max-width: 1024px) {
+  .flexbox {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .flexbox > details:nth-child(2) {
+    -o-order: 0;
+    -webkit-order: 0;
+    order: 0;
+  }
+}
+
+tr:target {
+  outline: ridge thick violet;
+}

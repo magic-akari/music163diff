@@ -1,256 +1,78 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Text;
+using System.Net.Http;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Microsoft.Win32;
+using Newtonsoft.Json;
 
 namespace music163diff
 {
-
     public class Log
     {
-        public string str { get; set; }
-        public Brush color { get; set; }
+        public string Str { get; set; }
+        public Brush Color { get; set; }
     }
 
     public class Logs : ObservableCollection<Log>
     {
         public Logs()
         {
-            Add(new Log()
+            Add(new Log
             {
-                str = "[" + DateTime.Now.ToLongTimeString() + "] 来自wws的歌单对比分析工具。ver:" + Application.ResourceAssembly.GetName().Version.ToString(),
-                color = Brushes.White
+                Str = "[" + DateTime.Now.ToLongTimeString() + "] 来自wws的歌单对比分析工具。ver:" +
+                      Application.ResourceAssembly.GetName().Version,
+                Color = Brushes.White
             });
         }
     }
 
     /// <summary>
-    /// Interaction logic for MainWindow.xaml
+    ///     Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow
     {
-        private Regex reg = new Regex(@"\d{5,}");
-        private Logs logs = new Logs();
+        private readonly string _style = Render.h("style", content: Properties.Resources.style);
 
-        private static Func<string, string> api = (string id) => $"http://music.163.com/api/playlist/detail?id={id}";
+        private List<Track> _intersect;
 
-        private Result result_a;
-        private Result result_b;
+        private Playlist _playlistA;
+        private Playlist _playlistB;
 
-        private List<Track> tracks_a;
-        private List<Track> tracks_b;
+        private List<Track> _tracksA;
+        private List<Track> _tracksB;
 
-        private List<Track> intersect;
-        private List<Track> remain_a;
-        private List<Track> remain_b;
-        private List<Track> union;
+        private List<Album> _albums;
+        private List<Album> _albumsA;
+        private List<Album> _albumsB;
+        private List<Album> _albumsIntersect;
+        private List<Album> _albumsRemainA;
+        private List<Album> _albumsRemainB;
 
-        private List<Track> intersect_pos_a;
-        private List<Track> intersect_pos_b;
-
-        private List<Track> remain_a_end;
-        private List<Track> remain_b_end;
-
-        private List<Album> albums;
-        private List<Album> albums_a;
-        private List<Album> albums_b;
-        private List<Album> albums_intersect;
-        private List<Album> albums_remain_a;
-        private List<Album> albums_remain_b;
-
-        private List<Artist> artists;
-        private List<Artist> artists_a;
-        private List<Artist> artists_b;
-        private List<Artist> artists_intersect;
-        private List<Artist> artists_remain_a;
-        private List<Artist> artists_remain_b;
-
-        private const string style = @"<style>
-table {
-  border-spacing: 0;
-  border-collapse: collapse;
-  width: 100%;
-}
-tr {
-  background-color: #fff;
-  border-top: 1px solid #c6cbd1;
-}
-tr:nth-child(2n) {
-  background-color: #f6f8fa;
-}
-th {
-  padding: 6px 13px;
-  border: 1px solid #dfe2e5;
-}
-td {
-  padding: 6px 13px;
-  border: 1px solid #dfe2e5;
-}
-a {
-  color: #111;
-  text-decoration: none;
-}
-a:hover {
-  color: #0366d6;
-  text-decoration: underline;
-}
-
-section {
-  border: 1px solid blue;
-  border-radius: 5px;
-  padding: 1rem;
-  margin: 1rem;
-}
-
-ul {
-  list-style-type: none;
-  padding: 0;
-}
-
-li {
-  padding: 6px 13px;
-  border: 1px solid #dfe2e5;
-  border-top: 1px solid #c6cbd1;
-}
-
-li:nth-child(2n) {
-  background-color: #f6f8fa;
-}
-summary {
-  font-size: 2rem;
-}
-img{
-  width: 100px;
-  height: 100px;
-}
-</style>
-";
-
-        private string Html
-        {
-            get => "<!DOCTYPE html><html><head><meta charset=\"utf-8\">" +
-                @"" +
-                $"<title>{result_a.name}-{result_b.name} 对比分析结果</title></head><body>" +
-                style +
-                $"<section>{Part1}" + $"{Part2}" + $"{(intersect_pos_a.Count == 0 ? "" : Part3) }" + $"{Part4}" + $"{Part5}" + "</section>" +
-                $"<section>{Part6}</section>" +
-                $"<section>{Part7}</section>" +
-                "</body></html>";
-        }
-
-        private string Part1
-        {
-            get => $"<p>总歌曲数:{union.Count}，相同歌曲数:{intersect.Count}</p>" +
-                "<table>" +
-                "<tr><th>歌单</th><th>封面</th><th>歌曲数</th><th>仅此歌单拥有的歌曲数</th></tr>" +
-                $"<tr><td>A({result_a.name})</td><td><img height=\"100\" width=\"100\" src=\"{result_a.coverImgUrl}\"></td><td>{tracks_a.Count}</td><td>{remain_a.Count}</td></tr>" +
-                $"<tr><td>B({result_b.name})</td><td><img height=\"100\" width=\"100\" src=\"{result_b.coverImgUrl}\"></td><td>{tracks_b.Count}</td><td>{remain_b.Count}</td></tr>" +
-                "</table>";
-        }
-
-        private string Part2
-        {
-            get => "<details open=\"open\">" +
-                $"<summary>完全相同的歌曲:({intersect.Count})</summary>" +
-                "<table>" +
-                $"{table(intersect)}" +
-                "</table>" +
-                "</details>";
-
-        }
-
-        private string Part3
-        {
-            get => "<details open=\"open\">" +
-                $"<summary>仅歌名相同的歌曲:({intersect_pos_a.Count})</summary>" +
-                "<table>" +
-                $"{table(intersect_pos_a)}" +
-                "</table>" +
-                "<table>" +
-                $"{table(intersect_pos_b)}" +
-                "</table>" +
-                "</details>";
-
-        }
-        private string Part4
-        {
-            get => "<details open=\"open\">" +
-                $"<summary>仅歌单 A 中存在的歌曲:({remain_a_end.Count})</summary>" +
-                "<table>" +
-                $"{table(remain_a_end)}" +
-                "</table>" +
-                "</details>";
-
-        }
-        private string Part5
-        {
-            get => "<details open=\"open\">" +
-                $"<summary>仅歌单 B 中存在的歌曲:({remain_b_end.Count})</summary>" +
-                "<table>" +
-                $"{table(remain_b_end)}" +
-                "</table>" +
-                "</details>";
-
-        }
-
-        private string Part6
-        {
-            get => "<details open=\"open\">" +
-                $"<summary>选曲专辑来源分析(共{albums.Count}个专辑)</summary>" +
-                $"<p>公共来源专辑:({albums_intersect.Count})</p>" +
-                "<ul>" +
-                String.Join("", albums_intersect.Select(al => $"<li><a target=\"_blank\" href=\"http://music.163.com/album/{al.id}\">{al.name}</a></li>").ToArray()) +
-                "</ul>" +
-                $"<p>仅歌单 A 涉及的专辑:({albums_remain_a.Count})</p>" +
-                "<ul>" +
-                String.Join("", albums_remain_a.Select(al => $"<li><a target=\"_blank\" href=\"http://music.163.com/album/{al.id}\">{al.name}</a></li>").ToArray()) +
-                "</ul>" +
-                $"<p>仅歌单 B 涉及的专辑:({albums_remain_b.Count})</p>" +
-                "<ul>" +
-                String.Join("", albums_remain_b.Select(al => $"<li><a target=\"_blank\" href=\"http://music.163.com/album/{al.id}\">{al.name}</a></li>").ToArray()) +
-                "</ul>" +
-                "</details>";
-        }
-
-        private string Part7
-        {
-            get => "<details open=\"open\">" +
-                $"<summary>选曲作者来源分析(共{artists.Count}位作者)</summary>" +
-                $"<p>公共作者:({artists_intersect.Count})</p>" +
-                 "<ul>" +
-               String.Join("", artists_intersect.Select(ar => $"<li><a target=\"_blank\" href=\"http://music.163.com/artist/{ar.id}\">{ar.name}</a></li>").ToArray()) +
-                 "</ul>" +
-                 $"<p>仅歌单 A 涉及的作者:({artists_remain_a.Count})</p>" +
-                 "<ul>" +
-               String.Join("", artists_remain_a.Select(ar => $"<li><a target=\"_blank\" href=\"http://music.163.com/artist/{ar.id}\">{ar.name}</a></li>").ToArray()) +
-                 "</ul>" +
-                 $"<p>仅歌单 B 涉及的作者:({artists_remain_b.Count})</p>" +
-                 "<ul>" +
-               String.Join("", artists_remain_b.Select(ar => $"<li><a target=\"_blank\" href=\"http://music.163.com/artist/{ar.id}\">{ar.name}</a></li>").ToArray()) +
-                 "</ul>" +
-                "</details>";
-        }
-
-        private static Func<List<Track>, string> table = (List<Track> tracks) =>
-        "<tr><th>歌名</th><th>作者</th><th>专辑</th></tr>" +
-        String.Join("", tracks.Select(tr => $"<tr><td><a target=\"_blank\" href=\"http://music.163.com/song/{tr.id}\">{tr.name}</a></td>" +
-        $"<td>{String.Join(",", tr.artists.Select(ar => $"<a target=\"_blank\" href=\"http://music.163.com/artist/{ar.id}\">{ar.name}</a>").ToArray())}</td>" +
-        $"<td><a target=\"_blank\" href=\"http://music.163.com/album/{tr.album.id}\">{tr.album.name}</td>" +
-        "</tr>").ToArray());
+        private List<Artist> _artists;
+        private List<Artist> _artistsA;
+        private List<Artist> _artistsB;
+        private List<Artist> _artistsIntersect;
+        private List<Artist> _artistsRemainA;
+        private List<Artist> _artistsRemainB;
+        private readonly Logs _logs = new Logs();
+        private readonly Regex _reg = new Regex(@"\d{5,}");
+        private List<Track> _remainA;
+        private List<Track> _remainB;
+        private List<Track> _union;
 
         public MainWindow()
         {
             InitializeComponent();
 
-            button.Click += Button_Click;
+            button.Click += Button_ClickAsync;
             url_a.GotFocus += TextBox_GotFocus;
             url_b.GotFocus += TextBox_GotFocus;
             url_a.LostFocus += TextBox_LostFocus;
@@ -259,78 +81,326 @@ img{
             expander.Expanded += Expander_Expanded;
             expander.Collapsed += Expander_Collapsed;
 
-            log_box.ItemsSource = logs;
+            log_box.ItemsSource = _logs;
+        }
 
+        private string Html => "<!DOCTYPE html>" +
+                               Render.h("html", content:
+                                   Render.h("head", content:
+                                       Render.h("meta",
+                                           new Dictionary<string, string>
+                                           {
+                                               ["charset"] = "utf-8"
+                                           }) +
+                                       Render.h("meta",
+                                           new Dictionary<string, string>
+                                           {
+                                               ["name"] = "viewport",
+                                               ["content"] = "width=device-width, initial-scale=1.0"
+                                           }) +
+                                       Render.h("meta",
+                                           new Dictionary<string, string>
+                                           {
+                                               ["http-equiv"] = "X-UA-Compatible",
+                                               ["content"] = "ie=edge"
+                                           }) +
+                                       Render.h("title",
+                                           content: WebUtility.HtmlEncode(
+                                               $"{_playlistA.name}-{_playlistB.name} 对比分析结果")) +
+                                       _style
+                                   ) +
+                                   Body
+                               );
+
+        private string Body => Render.h("body", content: SameSongs + SameAlbums + SameArtists);
+
+
+        private string SameSongs => Render.section(new Dictionary<string, string>
+        {
+            ["class"] = "samesongs"
+        }, string.Join("", Render.p(content: $"总歌曲数量：{_union.Count}，相同歌曲数：{_intersect.Count}"), Render.table(
+                content: string.Join("",
+                    Render.h("thead", content: Render.tr(content: string.Join("",
+                        Render.th(content: "歌单"),
+                        Render.th(content: "封面"),
+                        Render.th(content: "歌曲数")))),
+                    Render.h("tbody", content: string.Join("",
+
+                        // 
+                        Render.tr(content: string.Join("",
+                            Render.td(content: Render.a(new Dictionary<string, string>
+                            {
+                                ["target"] = "_blank",
+                                ["href"] = $"http://music.163.com/song/{_playlistA.id}"
+                            }, WebUtility.HtmlEncode(_playlistA.name))),
+                            Render.td(
+                                content: Render.img(new Dictionary<string, string>
+                                {
+                                    ["height"] = "140",
+                                    ["width"] = "140",
+                                    ["src"] = $"{_playlistA.coverImgUrl}?param=140y140"
+                                })), Render.td(content: $"{_remainA.Count} + {_intersect.Count}"))),
+                        // 
+                        Render.tr(content: string.Join(
+                            "",
+                            Render.td(content: Render.a(new Dictionary<string, string>
+                            {
+                                ["target"] = "_blank",
+                                ["href"] = $"http://music.163.com/song/{_playlistB.id}"
+                            }, WebUtility.HtmlEncode(_playlistB.name))),
+                            Render.td(content: Render.img(
+                                new Dictionary<string, string>
+                                {
+                                    ["height"] = "140",
+                                    ["width"] = "140",
+                                    ["src"] = $"{_playlistB.coverImgUrl}?param=140y140"
+                                })),
+                            Render.td(content: $"{_remainB.Count} + {_intersect.Count}")
+                        )))))),
+            Render.details(new Dictionary<string, string> {["open"] = "open"}, string.Join("",
+                Render.summary(new Dictionary<string, string>
+                {
+                    ["class"] = "large"
+                }, "选曲分析"),
+                Render.h("input", new Dictionary<string, string>
+                {
+                    ["type"] = "checkbox",
+                    ["id"] = "show_others",
+                    ["checked"] = "checked"
+                }),
+                Render.h("label", new Dictionary<string, string>
+                {
+                    ["for"] = "show_others"
+                }, "显示歌手和专辑"),
+                Render.h("input", new Dictionary<string, string>
+                {
+                    ["type"] = "checkbox",
+                    ["id"] = "only_same"
+                }),
+                Render.h("label", new Dictionary<string, string>
+                {
+                    ["for"] = "only_same"
+                }, "仅显示相同歌曲"),
+                Render.div(new Dictionary<string, string>
+                {
+                    ["class"] = "playlistContainer"
+                }, string.Join("",
+                    Table(_tracksA, "A", _playlistA.name),
+                    Table(_tracksB, "B", _playlistB.name)
+                ))))));
+
+
+        private string SameAlbums => Render.section(new Dictionary<string, string>
+            {
+                ["class"] = "samealbums"
+            }, Render.details(new Dictionary<string, string> {["open"] = "open"}, string.Join("",
+                Render.summary(new Dictionary<string, string> {["class"] = "large"}, $"选曲专辑来源分析(共{_albums.Count}个专辑)"),
+                Render.div(new Dictionary<string, string>
+                    {
+                        ["class"] = "flexbox"
+                    },
+                    string.Join("",
+                        Render.details(new Dictionary<string, string> {["open"] = "open"}, string.Join("",
+                            Render.summary(content: $"公共来源专辑:({_albumsIntersect.Count})"),
+                            Render.ul(content:
+                                string.Join("",
+                                    _albumsIntersect.Select(al =>
+                                        Render.li(content: Render.a(new Dictionary<string, string>
+                                        {
+                                            ["target"] = "_blank",
+                                            ["href"] = $"http://music.163.com/album/{al.id}"
+                                        }, WebUtility.HtmlEncode(al.name))))))
+                        )),
+                        Render.details(new Dictionary<string, string> {["open"] = "open"}, string.Join("",
+                            Render.summary(content: $"仅歌单 A 涉及的专辑: ({_albumsRemainA.Count})"),
+                            Render.ul(content:
+                                string.Join("",
+                                    _albumsRemainA.Select(al =>
+                                        Render.li(content: Render.a(new Dictionary<string, string>
+                                        {
+                                            ["target"] = "_blank",
+                                            ["href"] = $"http://music.163.com/album/{al.id}"
+                                        }, WebUtility.HtmlEncode(al.name))))))
+                        )),
+                        Render.details(new Dictionary<string, string> {["open"] = "open"}, string.Join("",
+                            Render.summary(content: $"仅歌单 B 涉及的专辑: ({_albumsRemainB.Count})"),
+                            Render.ul(content:
+                                string.Join("",
+                                    _albumsRemainB.Select(al =>
+                                        Render.li(content: Render.a(new Dictionary<string, string>
+                                        {
+                                            ["target"] = "_blank",
+                                            ["href"] = $"http://music.163.com/album/{al.id}"
+                                        }, WebUtility.HtmlEncode(al.name))))))
+                        ))
+                    ))
+            ))
+        );
+
+        private string SameArtists => Render.section(new Dictionary<string, string>
+            {
+                ["class"] = "sameartists"
+            }, Render.details(new Dictionary<string, string> {["open"] = "open"}, string.Join("",
+                Render.summary(new Dictionary<string, string> {["class"] = "large"}, $"选曲作者来源分析(共{_artists.Count}位作者)"),
+                Render.div(new Dictionary<string, string>
+                    {
+                        ["class"] = "flexbox"
+                    },
+                    string.Join("",
+                        Render.details(new Dictionary<string, string> {["open"] = "open"}, string.Join("",
+                            Render.summary(content: $"公共来源作者:({_artistsIntersect.Count})"),
+                            Render.ul(content:
+                                string.Join("",
+                                    _artistsIntersect.Select(ar =>
+                                        Render.li(content: Render.a(new Dictionary<string, string>
+                                        {
+                                            ["target"] = "_blank",
+                                            ["href"] = $"http://music.163.com/artist/{ar.id}"
+                                        }, WebUtility.HtmlEncode(ar.name))))))
+                        )),
+                        Render.details(new Dictionary<string, string> {["open"] = "open"}, string.Join("",
+                            Render.summary(content: $"仅歌单 A 涉及的作者: ({_artistsRemainA.Count})"),
+                            Render.ul(content:
+                                string.Join("",
+                                    _artistsRemainA.Select(ar =>
+                                        Render.li(content: Render.a(new Dictionary<string, string>
+                                        {
+                                            ["target"] = "_blank",
+                                            ["href"] = $"http://music.163.com/artist/{ar.id}"
+                                        }, WebUtility.HtmlEncode(ar.name))))))
+                        )),
+                        Render.details(new Dictionary<string, string> {["open"] = "open"}, string.Join("",
+                            Render.summary(content: $"仅歌单 B 涉及的作者: ({_artistsRemainB.Count})"),
+                            Render.ul(content:
+                                string.Join("",
+                                    _artistsRemainB.Select(ar =>
+                                        Render.li(content: Render.a(new Dictionary<string, string>
+                                        {
+                                            ["target"] = "_blank",
+                                            ["href"] = $"http://music.163.com/artist/{ar.id}"
+                                        }, WebUtility.HtmlEncode(ar.name))))))
+                        ))
+                    ))
+            ))
+        );
+
+
+        private string Table(List<Track> tracks, string trackNo, string caption)
+        {
+            return Render.table(new Dictionary<string, string> {["class"] = "playlist " + trackNo},
+                string.Join("",
+                    Render.h("caption", content: caption),
+                    Render.h("thead",
+                        content: Render.tr(
+                            content: string.Join("",
+                                Render.th(content: "#"),
+                                Render.th(content: "音乐标题"),
+                                Render.th(content: "歌手"),
+                                Render.th(content: "专辑")))),
+                    Render.h("tbody",
+                        content: string.Join("",
+                            tracks.Select((t, index) =>
+                            {
+                                var same = _intersect.Any(i => i.id == t.id);
+                                var indexString = (index + 1).ToString();
+                                return Render.tr(
+                                    new Dictionary<string, string>
+                                    {
+                                        ["id"] = trackNo + t.id,
+                                        ["class"] = same ? "same" : ""
+                                    },
+                                    string.Join("",
+                                        Render.td(content: same
+                                            ? Render.a(new Dictionary<string, string>
+                                            {
+                                                ["href"] = "#" + (trackNo == "A" ? "B" : "A") + t.id
+                                            }, indexString)
+                                            : indexString),
+                                        Render.td(content: Render.a(
+                                            new Dictionary<string, string>
+                                            {
+                                                ["target"] = "_blank",
+                                                ["href"] = $"http://music.163.com/song/{t.id}"
+                                            }, WebUtility.HtmlEncode(t.name))),
+                                        Render.td(content: string.Join(",",
+                                            t.ar.Select(ar =>
+                                                Render.a(
+                                                    new Dictionary<string, string>
+                                                    {
+                                                        ["target"] = "_blank",
+                                                        ["href"] = $"http://music.163.com/artist/{ar.id}"
+                                                    }, WebUtility.HtmlEncode(ar.name))))),
+                                        Render.td(content: Render.a(
+                                            new Dictionary<string, string>
+                                            {
+                                                ["target"] = "_blank",
+                                                ["href"] = $"http://music.163.com/album/{t.al.id}"
+                                            }, WebUtility.HtmlEncode(t.al.name)))));
+                            })))));
         }
 
         private void Expander_Collapsed(object sender, RoutedEventArgs e)
         {
-            this.Height -= 50;
+            Height -= 50;
         }
 
         private void Expander_Expanded(object sender, RoutedEventArgs e)
         {
-            this.Height += 50;
+            Height += 50;
         }
 
         private void TextBox_LostFocus(object sender, RoutedEventArgs e)
         {
-            var textbox = sender as TextBox;
-            if (textbox.Text.Trim().Length == 0)
-            {
+            if (sender is TextBox textbox && textbox.Text.Trim().Length == 0)
                 textbox.Background = null;
-            }
         }
 
         private void TextBox_GotFocus(object sender, RoutedEventArgs e)
         {
-            var textbox = sender as TextBox;
-            textbox.Background = Brushes.White;
+            if (sender is TextBox textbox) textbox.Background = Brushes.White;
         }
 
         private void Add_Log(string str, Brush color = null)
         {
             if (color == null)
-            {
                 color = Brushes.White;
-            }
+            _logs.Add(new Log
 
-            logs.Add(new Log()
             {
-                str = "[" + DateTime.Now.ToLongTimeString() + "] " + str,
-                color = color
+                Str = "[" + DateTime.Now.ToLongTimeString() + "] " + str,
+                Color = color
             });
 
             scrollview.ScrollToBottom();
         }
 
-        private void Button_Click(object sender, RoutedEventArgs e)
+        private async void Button_ClickAsync(object sender, RoutedEventArgs e)
         {
-            var mc_a = reg.Match(url_a.Text);
-            var mc_b = reg.Match(url_b.Text);
-            if (!mc_a.Success)
+            var mcA = _reg.Match(url_a.Text);
+            var mcB = _reg.Match(url_b.Text);
+
+            if (!mcA.Success)
             {
                 Add_Log("歌单 A 没有填好", Brushes.Red);
                 return;
             }
-            if (!mc_b.Success)
+            if (!mcB.Success)
             {
                 Add_Log("歌单 B 没有填好", Brushes.Red);
                 return;
             }
 
-            var a = mc_a.Value;
-            var b = mc_b.Value;
-
+            var a = int.Parse(mcA.Value);
+            var b = int.Parse(mcB.Value);
             Add_Log($"A={a},B={b}");
-            var json_a = string.Empty;
-            var json_b = string.Empty;
+
+            string jsonA;
+            string jsonB;
 
             try
             {
-                json_a = Get_Json(a);
-                json_b = Get_Json(b);
-
+                jsonA = await Get_JsonAsync(a);
+                jsonB = await Get_JsonAsync(b);
             }
             catch (Exception err)
             {
@@ -339,62 +409,56 @@ img{
             }
 
 
-            var res_a = JsonConvert.DeserializeObject<ResponseJson>(json_a);
-            var res_b = JsonConvert.DeserializeObject<ResponseJson>(json_b);
-            if (res_a.code != 200)
+            var resA = JsonConvert.DeserializeObject<ResponseJson>(jsonA);
+            var resB = JsonConvert.DeserializeObject<ResponseJson>(jsonB);
+
+            if (resA.code != 200)
             {
                 Add_Log("歌单 A 获取失败", Brushes.Red);
-                Add_Log(json_a, Brushes.Red);
+                Add_Log(jsonA, Brushes.Red);
                 return;
             }
             Add_Log("歌单 A 信息已获取");
 
-            if (res_b.code != 200)
+            if (resB.code != 200)
             {
                 Add_Log("歌单 B 获取失败", Brushes.Red);
-                Add_Log(json_b, Brushes.Red);
+                Add_Log(jsonB, Brushes.Red);
                 return;
             }
+
             Add_Log("歌单 B 信息已获取");
 
-            result_a = res_a.result;
-            result_b = res_b.result;
+            _playlistA = resA.playlist;
+            _playlistB = resB.playlist;
 
-            tracks_a = result_a.tracks;
-            tracks_b = result_b.tracks;
+            _tracksA = _playlistA.tracks;
+            _tracksB = _playlistB.tracks;
+            _intersect = _tracksA.Intersect(_tracksB).ToList();
+            _remainA = _tracksA.Except(_tracksB).ToList();
+            _remainB = _tracksB.Except(_tracksA).ToList();
+            _union = _tracksA.Union(_tracksB).ToList();
 
-            intersect = tracks_a.Intersect(tracks_b).ToList();
-            remain_a = tracks_a.Except(tracks_b).ToList();
-            remain_b = tracks_b.Except(tracks_a).ToList();
-            union = tracks_a.Union(tracks_b).ToList();
+            Add_Log($"总歌曲数量={_union.Count}");
+            Add_Log($"歌单A重复率={_intersect.Count}/{_tracksA.Count}");
+            Add_Log($"歌单B重复率={_intersect.Count}/{_tracksB.Count}");
+            Add_Log($"相似度={_intersect.Count}/{_union.Count}");
 
-            intersect_pos_a = remain_a.Where(r_a => remain_b.Select(r_b => r_b.name.ToLower()).Contains(r_a.name.ToLower())).OrderBy(t => t.name).ToList();
-            intersect_pos_b = remain_b.Where(r_b => remain_a.Select(r_a => r_a.name.ToLower()).Contains(r_b.name.ToLower())).OrderBy(t => t.name).ToList();
+            _albums = _union.Select(tr => tr.al).Distinct().ToList();
+            _albumsA = _tracksA.Select(tr => tr.al).Distinct().ToList();
+            _albumsB = _tracksB.Select(tr => tr.al).Distinct().ToList();
+            _albumsIntersect = _albumsA.Intersect(_albumsB).ToList();
+            _albumsRemainA = _albumsA.Except(_albumsIntersect).ToList();
+            _albumsRemainB = _albumsB.Except(_albumsIntersect).ToList();
 
-            remain_a_end = remain_a.Except(intersect_pos_a).ToList();
-            remain_b_end = remain_b.Except(intersect_pos_b).ToList();
+            _artists = _union.SelectMany(tr => tr.ar).Distinct().ToList();
+            _artistsA = _tracksA.SelectMany(tr => tr.ar).Distinct().ToList();
+            _artistsB = _tracksB.SelectMany(tr => tr.ar).Distinct().ToList();
+            _artistsIntersect = _artistsA.Intersect(_artistsB).ToList();
+            _artistsRemainA = _artistsA.Except(_artistsIntersect).ToList();
+            _artistsRemainB = _artistsB.Except(_artistsIntersect).ToList();
 
-            Add_Log($"总歌曲数量={union.Count}");
-            Add_Log($"歌单A重复率={intersect.Count }/{ tracks_a.Count}~{(intersect.Count + intersect_pos_a.Count)}/{ tracks_a.Count}");
-            Add_Log($"歌单B重复率={intersect.Count }/{ tracks_b.Count}~{(intersect.Count + intersect_pos_b.Count) }/{ tracks_b.Count}");
-            Add_Log($"相似度={intersect.Count }/{ union.Count}~{ (intersect.Count + intersect_pos_a.Count) }/{ union.Count}");
-
-            albums = union.Select(tr => tr.album).Distinct().ToList();
-            albums_a = tracks_a.Select(tr => tr.album).Distinct().ToList();
-            albums_b = tracks_b.Select(tr => tr.album).Distinct().ToList();
-            albums_intersect = albums_a.Intersect(albums_b).ToList();
-            albums_remain_a = albums_a.Except(albums_intersect).ToList();
-            albums_remain_b = albums_b.Except(albums_intersect).ToList();
-
-            artists = union.SelectMany(tr => tr.artists).Distinct().ToList();
-            artists_a = tracks_a.SelectMany(tr => tr.artists).Distinct().ToList();
-            artists_b = tracks_b.SelectMany(tr => tr.artists).Distinct().ToList();
-            artists_intersect = artists_a.Intersect(artists_b).ToList();
-            artists_remain_a = artists_a.Except(artists_intersect).ToList();
-            artists_remain_b = artists_b.Except(artists_intersect).ToList();
-
-
-            var sfd = new Microsoft.Win32.SaveFileDialog()
+            var sfd = new SaveFileDialog
             {
                 Filter = "Html文档(*.html)|*.html"
             };
@@ -407,19 +471,44 @@ img{
         }
 
 
-
-
-        private static string Get_Json(string id)
+        private static async Task<string> Get_JsonAsync(int id)
         {
-            var request = WebRequest.Create(api(id)) as HttpWebRequest;
-            request.ContentType = "application/json; charset=utf-8";
-            var response = request.GetResponse() as HttpWebResponse;
+            var baseAddress = new Uri("http://music.163.com");
+            var cookieContainer = new CookieContainer();
 
-            var result = string.Empty;
-            using (Stream responseStream = response.GetResponseStream())
+            using (var handler = new HttpClientHandler {CookieContainer = cookieContainer})
+            using (var client = new HttpClient(handler) {BaseAddress = baseAddress})
             {
-                StreamReader reader = new StreamReader(responseStream, Encoding.UTF8);
-                return reader.ReadToEnd();
+                var data = JsonConvert.SerializeObject(
+                    new
+                    {
+                        url = "http://music.163.com/api/v3/playlist/detail",
+                        method = "POST",
+                        @params = new {id, n = 1000}
+                    }
+                );
+
+                var values = new Dictionary<string, string>
+                {
+                    ["eparams"] =
+                    AESECB.NetEaseMusic163LinuxEncryptor(
+                        data
+                    )
+                };
+                var content = new FormUrlEncodedContent(values);
+
+                client.DefaultRequestHeaders.Add("User-Agent",
+                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 " +
+                    "(KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36");
+
+                client.DefaultRequestHeaders.Add("Origin", "orpheus://orpheus");
+                cookieContainer.Add(baseAddress, new Cookie("os", "linux"));
+                cookieContainer.Add(baseAddress, new Cookie("appver", "1.1.0.1232"));
+                cookieContainer.Add(baseAddress, new Cookie("osver", "unkonow"));
+                cookieContainer.Add(baseAddress, new Cookie("channel", "release"));
+
+                var response = await client.PostAsync("/api/linux/forward", content);
+                return await response.Content.ReadAsStringAsync();
             }
         }
     }

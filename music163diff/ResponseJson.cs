@@ -5,12 +5,13 @@ namespace music163diff
 {
     class ResponseJson
     {
-        public Result result { get; set; }
+        public Playlist playlist { get; set; }
         public int code { get; set; }
     }
 
-    struct Result
+    struct Playlist
     {
+        public int id { get; set; }
         public string name { get; set; }
         public string coverImgUrl { get; set; }
         public List<Track> tracks { get; set; }
@@ -20,8 +21,8 @@ namespace music163diff
     {
         public string name { get; set; }
         public long id { get; set; }
-        public Album album { get; set; }
-        public List<Artist> artists { get; set; }
+        public Album al { get; set; }
+        public List<Artist> ar { get; set; }
 
         public bool Equals(Track other)
         {
