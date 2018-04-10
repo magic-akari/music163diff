@@ -1,0 +1,29 @@
+{
+  "name": "music163diff",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prebuild": "rm -rf dist",
+    "build": "tsc",
+    "postbuild": "cp -r src/static/* dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hufan-akari/music163diff.git"
+  },
+  "keywords": [],
+  "author": "阿卡琳",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/hufan-akari/music163diff/issues"
+  },
+  "homepage": "https://github.com/hufan-akari/music163diff#readme",
+  "devDependencies": {
+    "@types/react": "^16.3.5",
+    "@types/react-dom": "^16.0.4",
+    "typescript": "^2.8.1"
+  },
+  "dependencies": {}
+}
